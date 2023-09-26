@@ -15,6 +15,22 @@ source config.sh
 DOMAIN=${CERTBOT_DOMAIN}
 VALIDATION=${CERTBOT_VALIDATION}
 
+
+if [ ! -d "$CACHE" ]; then
+	echo "mkdir -p $CACHE"
+	mkdir -p "$CACHE"
+fi
+
+
+#if [ -f $CACHE$DOMAIN.xml ]; then
+#	rm -f $CACHE$DOMAIN.xml
+#fi
+
+#if [ -f $RESPONSE ]; then
+
+#	rm -f $RESPONSE
+#fi
+
 ## Get the XML & record ID
 curl -s "https://www.namesilo.com/api/dnsListRecords?version=1&type=xml&key=$APIKEY&domain=$DOMAIN" > $CACHE$DOMAIN.xml
 
@@ -32,8 +48,8 @@ then
 	case $RESPONSE_CODE in
 		300)
 			echo "Update success. Please wait 15 minutes for validation..."
-			# Records are published every 15 minutes. Wait for 16 minutes, and then proceed.
-			for (( i=0; i<16; i++ )); do
+			# Records are published every 15 minutes. Wait for ${WAITTIME} minutes, and then proceed.
+			for (( i=0; i<WAITTIME; i++ )); do
 				echo "Minute" ${i}
 				sleep 60s
 			done
@@ -63,8 +79,8 @@ else
 	case $RESPONSE_CODE in
 		300)
 			echo "Addition success. Please wait 15 minutes for validation..."
-			# Records are published every 15 minutes. Wait for 16 minutes, and then proceed.
-			for (( i=0; i<16; i++ )); do
+			# Records are published every 15 minutes. Wait for WAITTIME minutes, and then proceed.
+			for (( i=0; i<WAITTIME; i++ )); do
 				echo "Minute" ${i}
 				sleep 60s
 			done

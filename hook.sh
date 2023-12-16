@@ -14,7 +14,6 @@ source config.sh
 
 DOMAIN=${CERTBOT_DOMAIN}
 VALIDATION=${CERTBOT_VALIDATION}
-WAITTIME=20
 
 if [ ! -d "$CACHE" ]; then
 	echo "mkdir -p $CACHE"

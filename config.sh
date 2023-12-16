@@ -4,3 +4,4 @@
 APIKEY="YOUR_API_KEY"
 CACHE="tmp/"
 RESPONSE="$CACHE/namesilo_response.xml"
+WAITTIME=20

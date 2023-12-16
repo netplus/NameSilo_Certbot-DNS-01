@@ -14,7 +14,7 @@ source config.sh
 
 DOMAIN=${CERTBOT_DOMAIN}
 VALIDATION=${CERTBOT_VALIDATION}
-
+WAITTIME=20
 
 if [ ! -d "$CACHE" ]; then
 	echo "mkdir -p $CACHE"
@@ -47,8 +47,8 @@ then
 	## Process response, maybe wait
 	case $RESPONSE_CODE in
 		300)
-			echo "Update success. Please wait 15 minutes for validation..."
-			# Records are published every 15 minutes. Wait for ${WAITTIME} minutes, and then proceed.
+			echo "Update success. Please wait ${WAITTIME} minutes for validation..."
+			# Records are published every ${WAITTIME} minutes. Wait for ${WAITTIME} minutes, and then proceed.
 			for (( i=0; i<WAITTIME; i++ )); do
 				echo "Minute" ${i}
 				sleep 60s
@@ -78,8 +78,8 @@ else
 	## Process response, maybe wait
 	case $RESPONSE_CODE in
 		300)
-			echo "Addition success. Please wait 15 minutes for validation..."
-			# Records are published every 15 minutes. Wait for WAITTIME minutes, and then proceed.
+			echo "Addition success. Please wait ${WAITTIME} minutes for validation..."
+			# Records are published every ${WAITTIME} minutes. Wait for WAITTIME minutes, and then proceed.
 			for (( i=0; i<WAITTIME; i++ )); do
 				echo "Minute" ${i}
 				sleep 60s

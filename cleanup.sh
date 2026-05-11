@@ -80,6 +80,10 @@ fi
 
 ACME_FQDN="${RRHOST}.${BASE_DOMAIN}"
 
+# Global array populated by find_record_ids_with_retry(). Keeping the result in
+# a variable avoids capturing human-readable log output as if it were an rrid.
+RECORD_IDS=()
+
 namesilo_api() {
   local endpoint="$1"
   local output="$2"
@@ -158,13 +162,16 @@ delete_record() {
 find_record_ids_with_retry() {
   local attempt ids
 
+  RECORD_IDS=()
+
   for (( attempt=1; attempt<=CLEANUP_LIST_RETRY_COUNT; attempt++ )); do
     list_records
     log_current_acme_records_from_api
 
     ids="$(record_ids_for_current_validation | tr '\n' ' ')"
     if [[ -n "${ids// }" ]]; then
-      printf '%s\n' $ids
+      # shellcheck disable=SC2206
+      RECORD_IDS=( $ids )
       return 0
     fi
 
@@ -185,7 +192,7 @@ if [[ -z "$VALIDATION" ]]; then
   exit 0
 fi
 
-mapfile -t RECORD_IDS < <(find_record_ids_with_retry || true)
+find_record_ids_with_retry || true
 
 if (( ${#RECORD_IDS[@]} == 0 )); then
   # Do not fail certificate renewal only because cleanup cannot find a record.

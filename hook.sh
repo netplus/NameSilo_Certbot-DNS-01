@@ -39,13 +39,17 @@ die() {
   exit 1
 }
 
+format_duration() {
+  local total="$1"
+  printf '%02dh%02dm%02ds' "$((total / 3600))" "$(((total % 3600) / 60))" "$((total % 60))"
+}
+
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "Required command not found: $1"
 }
 
 require_cmd curl
 require_cmd xmllint
-require_cmd awk
 
 : "${APIKEY:?APIKEY must be set in config.sh}"
 : "${CERTBOT_DOMAIN:?CERTBOT_DOMAIN is not set by Certbot}"
@@ -183,6 +187,7 @@ txt_visible_from_nameserver() {
 
 wait_for_dns_propagation() {
   local ns_list deadline attempt missing ns
+  local start_time elapsed remaining visible_count total_ns max_attempts
 
   # dig is optional at install time, but it gives us deterministic behavior: we
   # wait until the authoritative NameSilo nameservers can actually answer with
@@ -200,26 +205,45 @@ wait_for_dns_propagation() {
     return 0
   fi
 
-  log "Waiting for DNS propagation: ${ACME_FQDN} TXT, timeout=${DNS_PROPAGATION_TIMEOUT_SECONDS}s, interval=${DNS_POLL_INTERVAL_SECONDS}s"
-  log "Authoritative nameservers: $(echo "$ns_list" | tr '\n' ' ')"
+  total_ns=0
+  while IFS= read -r ns; do
+    [[ -z "$ns" ]] && continue
+    total_ns=$((total_ns + 1))
+  done <<< "$ns_list"
 
-  deadline=$((SECONDS + DNS_PROPAGATION_TIMEOUT_SECONDS))
+  max_attempts=$(((DNS_PROPAGATION_TIMEOUT_SECONDS + DNS_POLL_INTERVAL_SECONDS - 1) / DNS_POLL_INTERVAL_SECONDS + 1))
+
+  log "Waiting for DNS propagation: ${ACME_FQDN} TXT, timeout=$(format_duration "$DNS_PROPAGATION_TIMEOUT_SECONDS"), interval=${DNS_POLL_INTERVAL_SECONDS}s"
+  log "Authoritative nameservers (${total_ns}): $(echo "$ns_list" | tr '\n' ' ')"
+  log "Progress hint: waiting until all ${total_ns} authoritative nameservers return the expected TXT value. This may take several minutes on NameSilo/DNSOWL."
+
+  start_time=$SECONDS
+  deadline=$((start_time + DNS_PROPAGATION_TIMEOUT_SECONDS))
   attempt=1
 
   while (( SECONDS <= deadline )); do
     missing=0
+    visible_count=0
+    elapsed=$((SECONDS - start_time))
+    remaining=$((deadline - SECONDS))
+    (( remaining < 0 )) && remaining=0
+
+    log "DNS propagation check ${attempt}/${max_attempts}: elapsed=$(format_duration "$elapsed"), remaining=$(format_duration "$remaining")"
 
     while IFS= read -r ns; do
       [[ -z "$ns" ]] && continue
       if txt_visible_from_nameserver "$ns"; then
+        visible_count=$((visible_count + 1))
         log "TXT is visible on ${ns}"
       else
         missing=1
       fi
     done <<< "$ns_list"
 
+    log "DNS propagation progress: ${visible_count}/${total_ns} authoritative nameservers visible."
+
     if (( missing == 0 )); then
-      log "DNS propagation confirmed on all authoritative nameservers."
+      log "DNS propagation confirmed on all authoritative nameservers after $(format_duration "$elapsed")."
       return 0
     fi
 
@@ -227,12 +251,12 @@ wait_for_dns_propagation() {
       break
     fi
 
-    log "DNS propagation not complete; retry ${attempt} after ${DNS_POLL_INTERVAL_SECONDS}s"
+    log "DNS propagation not complete; next check in ${DNS_POLL_INTERVAL_SECONDS}s. Keep waiting..."
     sleep "$DNS_POLL_INTERVAL_SECONDS"
     attempt=$((attempt + 1))
   done
 
-  die "TXT record ${ACME_FQDN} did not propagate within ${DNS_PROPAGATION_TIMEOUT_SECONDS}s"
+  die "TXT record ${ACME_FQDN} did not propagate within $(format_duration "$DNS_PROPAGATION_TIMEOUT_SECONDS")"
 }
 
 log "Received DNS-01 challenge request for ${DOMAIN}"
